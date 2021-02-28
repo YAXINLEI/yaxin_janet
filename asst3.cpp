@@ -183,6 +183,9 @@ struct Geometry {
     }
 };
 
+
+
+
 // Vertex buffer and index buffer associated with the ground and cube geometry
 // ADDED
 static shared_ptr<Geometry> g_ground, g_cube, g_cube2;
@@ -194,6 +197,11 @@ static const Cvec3 g_light1(2.0, 3.0, 14.0),
 
 // initialization: eye is in front of the object and world
 static Matrix4 g_skyRbt = Matrix4::makeTranslation(Cvec3(0.0, 0.25, 4.0));
+
+// ADDED
+static Matrix4 g_curEye = g_skyRbt;
+static int g_curEyeLabel = 0;      // 0: sky, 1: cube1, 2: cube2;
+
 // notes: identity matrix
 // ADDED
 static Matrix4 g_objectRbt[2] = {Matrix4::makeTranslation(Cvec3(-1, 0, 0)), 
@@ -286,7 +294,8 @@ static void drawStuff() {
     sendProjectionMatrix(curSS, projmat);
 
     // use the skyRbt as the eyeRbt
-    const Matrix4 eyeRbt = g_skyRbt;
+    // ADDED: changed eyeRbt value
+    const Matrix4 eyeRbt = g_curEye;
     const Matrix4 invEyeRbt = inv(eyeRbt);
 
     // since the eye position may be changing, we need to pass this in every frame
@@ -415,6 +424,22 @@ static void keyboard(GLFWwindow* window, int key, int scancode, int action, int 
             break;
         case GLFW_KEY_SPACE:
             g_spaceDown = true;
+            break;
+        // ADDED
+        case GLFW_KEY_V:
+            if (g_curEyeLabel == 0) {
+                g_curEye= g_objectRbt[0];
+                g_curEyeLabel = 1;
+                cout << "Now using Cube 1 as point of view." << endl;
+            } else if (g_curEyeLabel == 1) {
+                g_curEye= g_objectRbt[1];
+                g_curEyeLabel = 2;
+                cout << "Now using Cube 2 as point of view." << endl;
+            } else {
+                g_curEye= g_skyRbt;
+                g_curEyeLabel = 0;
+                cout << "Now using Sky/Eye as point of view." << endl;
+            }
             break;
         }
     } else {
