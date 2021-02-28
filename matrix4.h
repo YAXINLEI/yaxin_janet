@@ -272,13 +272,25 @@ inline Matrix4 normalMatrix(const Matrix4 &m) { // get the normal matrix (v332)
 inline Matrix4 transFact(const Matrix4 &m) {
     // TODO
     // Currently return a dummy identity matrix, you need to change this
-    return Matrix4();
+    // ADDED
+    Matrix4 Mtrans = Matrix4();
+    Mtrans.makeTranslation(Cvec3(m(0, 3), m(1, 3), m(2, 3)));
+    return Mtrans;
 }
 
 inline Matrix4 linFact(const Matrix4 &m) {
     // TODO
     // Currently return a dummy identity matrix, you need to change this
-    return Matrix4();
+    // ADDED
+    double vectortemp[16];
+    m.writeToColumnMajorMatrix(vectortemp);
+    vectortemp[3] = 0;
+    vectortemp[7] = 0;
+    vectortemp[11] = 0;
+
+    Matrix4 Mlin = Matrix4();
+    Mlin.readFromColumnMajorMatrix(vectortemp);
+    return Mlin;
 }
 
 #endif
