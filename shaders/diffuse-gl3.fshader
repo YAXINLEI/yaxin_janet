@@ -1,9 +1,9 @@
 #version 150
 
-uniform vec3 uLight, uLight2, uColor;
+uniform vec3 uLight, uLight2, uColor; //notes: underlying color of the surface
 
-in vec3 vNormal;
-in vec3 vPosition;
+in vec3 vNormal;      //notes: intended normal at the point
+in vec3 vPosition;    //notes: eye coordinate of the object
 
 out vec4 fragColor;
 

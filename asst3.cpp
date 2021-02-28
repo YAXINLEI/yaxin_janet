@@ -107,8 +107,7 @@ static const char *const g_shaderFiles[g_numShaders][2] = {
 static const char *const g_shaderFilesGl2[g_numShaders][2] = {
     {"./shaders/basic-gl2.vshader", "./shaders/diffuse-gl2.fshader"},
     {"./shaders/basic-gl2.vshader", "./shaders/solid-gl2.fshader"}};
-static vector<shared_ptr<ShaderState>>
-    g_shaderStates; // our global shader states
+static vector<shared_ptr<ShaderState>> g_shaderStates; // our global shader states
 
 // --------- Geometry
 
@@ -117,7 +116,7 @@ static vector<shared_ptr<ShaderState>>
 
 // A vertex with floating point position and normal
 struct VertexPN {
-    Cvec3f p, n;
+    Cvec3f p, n;    // point, normal
 
     VertexPN() {}
     VertexPN(float x, float y, float z, float nx, float ny, float nz)
@@ -157,7 +156,7 @@ struct Geometry {
         // bind the object's VAO
         glBindVertexArray(vao);
 
-        // Enable the attributes used by our shader
+        // Enable the attributes used by our shader. Our design decision assumes that we already have the position and normal
         safe_glEnableVertexAttribArray(curSS.h_aPosition);
         safe_glEnableVertexAttribArray(curSS.h_aNormal);
 
@@ -172,6 +171,7 @@ struct Geometry {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
 
         // draw!
+        // start at 0
         glDrawElements(GL_TRIANGLES, iboLen, GL_UNSIGNED_SHORT, 0);
 
         // Disable the attributes used by our shader
@@ -184,16 +184,21 @@ struct Geometry {
 };
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
-static shared_ptr<Geometry> g_ground, g_cube;
+// ADDED
+static shared_ptr<Geometry> g_ground, g_cube, g_cube2;
 
 // --------- Scene
 
 static const Cvec3 g_light1(2.0, 3.0, 14.0),
     g_light2(-2, -3.0, -5.0); // define two lights positions in world space
+
+// initialization: eye is in front of the object and world
 static Matrix4 g_skyRbt = Matrix4::makeTranslation(Cvec3(0.0, 0.25, 4.0));
-static Matrix4 g_objectRbt[1] = {Matrix4::makeTranslation(
-    Cvec3(0, 0, 0))}; // currently only 1 obj is defined
-static Cvec3f g_objectColors[1] = {Cvec3f(1, 0, 0)};
+// notes: identity matrix
+// ADDED
+static Matrix4 g_objectRbt[2] = {Matrix4::makeTranslation(Cvec3(-1, 0, 0)), 
+                                 Matrix4::makeTranslation(Cvec3(1, 0, 0))}; // currently only 1 obj is defined
+static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 
 ///////////////// END OF G L O B A L S
 /////////////////////////////////////////////////////
@@ -201,13 +206,14 @@ static Cvec3f g_objectColors[1] = {Cvec3f(1, 0, 0)};
 static void initGround() {
     // A x-z plane at y = g_groundY of dimension [-g_groundSize, g_groundSize]^2
     VertexPN vtx[4] = {
-        VertexPN(-g_groundSize, g_groundY, -g_groundSize, 0, 1, 0),
+        VertexPN(-g_groundSize, g_groundY, -g_groundSize, 0, 1, 0),   // the last three are the normal
         VertexPN(-g_groundSize, g_groundY, g_groundSize, 0, 1, 0),
         VertexPN(g_groundSize, g_groundY, g_groundSize, 0, 1, 0),
         VertexPN(g_groundSize, g_groundY, -g_groundSize, 0, 1, 0),
     };
-    unsigned short idx[] = {0, 1, 2, 0, 2, 3};
-    g_ground.reset(new Geometry(&vtx[0], &idx[0], 4, 6));
+    unsigned short idx[] = {0, 1, 2, 0, 2, 3};    // 0, 1 ,2 is the first triangle, 0, 2, 3 is the second triangle
+    g_ground.reset(new Geometry(&vtx[0], &idx[0], 4, 6));    // 4 vertices and 6 ibo data
+    // create g_group geometry object
 }
 
 static void initCubes() {
@@ -218,8 +224,19 @@ static void initCubes() {
     vector<VertexPN> vtx(vbLen);
     vector<unsigned short> idx(ibLen);
 
+    // fill these objects in
     makeCube(1, vtx.begin(), idx.begin());
+    // create the object
     g_cube.reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
+
+    // ADDED
+    // Temporary storage for cube geometry
+    vector<VertexPN> vtx2(vbLen);
+    vector<unsigned short> idx2(ibLen);
+    // fill these objects in
+    makeCube(1, vtx2.begin(), idx2.begin());
+    // create the object
+    g_cube2.reset(new Geometry(&vtx2[0], &idx2[0], vbLen, ibLen));
 }
 
 // takes a projection matrix and send to the the shaders
@@ -272,6 +289,7 @@ static void drawStuff() {
     const Matrix4 eyeRbt = g_skyRbt;
     const Matrix4 invEyeRbt = inv(eyeRbt);
 
+    // since the eye position may be changing, we need to pass this in every frame
     const Cvec3 eyeLight1 = Cvec3(
         invEyeRbt * Cvec4(g_light1, 1)); // g_light1 position in eye coordinates
     const Cvec3 eyeLight2 = Cvec3(
@@ -282,8 +300,8 @@ static void drawStuff() {
     // draw ground
     // ===========
     //
-    const Matrix4 groundRbt = Matrix4(); // identity
-    Matrix4 MVM = invEyeRbt * groundRbt;
+    const Matrix4 groundRbt = Matrix4(); // identity, we tie the ground to the world matrix
+    Matrix4 MVM = invEyeRbt * groundRbt; //E^(-1)O, this will take object coordinate and turn into eye coordinates
     Matrix4 NMVM = normalMatrix(MVM);
     sendModelViewNormalMatrix(curSS, MVM, NMVM);
     safe_glUniform3f(curSS.h_uColor, 0.1, 0.95, 0.1); // set color
@@ -297,6 +315,14 @@ static void drawStuff() {
     safe_glUniform3f(curSS.h_uColor, g_objectColors[0][0], g_objectColors[0][1],
                      g_objectColors[0][2]);
     g_cube->draw(curSS);
+
+    // ADDED: draw the second cube
+    MVM = invEyeRbt * g_objectRbt[1];
+    NMVM = normalMatrix(MVM);
+    sendModelViewNormalMatrix(curSS, MVM, NMVM);
+    safe_glUniform3f(curSS.h_uColor, g_objectColors[1][0], g_objectColors[1][1],
+                     g_objectColors[1][2]);
+    g_cube2->draw(curSS);
 }
 
 static void display() {
@@ -437,9 +463,15 @@ static void initGLState() {
     glClearDepth(0.);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    
+    // tell OpenGL to never call a back facing triangle
     glCullFace(GL_BACK);
     glEnable(GL_CULL_FACE);
+    
+    // front are always great
     glEnable(GL_DEPTH_TEST);
+
+    // since we are looking at -z axis, greater values are in the front
     glDepthFunc(GL_GREATER);
     glReadBuffer(GL_BACK);
     if (!g_Gl2Compatible)
